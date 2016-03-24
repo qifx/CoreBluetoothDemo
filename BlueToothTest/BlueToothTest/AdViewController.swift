@@ -4,19 +4,19 @@
 //
 //  Created by qifx on 3/21/16.
 //  Copyright © 2016 qifx. All rights reserved.
-//
+//  外围设备
 
 import UIKit
 import CoreBluetooth
 
 
-var kServiceUUID = "C4FB2349-72FE-4CA2-94D6-1F3CB16331EE"
-var kCharacteristicUUID = "6A3E4B28-522D-4B3B-82A9-D5E2004534FC"
+var kServiceUUID = "CDC504CF-22D4-47DC-B842-3E0DB8BE2594"
+var kCharacteristicUUID = "334E6E68-D6AE-4DDD-86B9-96D2AC80E396"
+var name = "CoreBluetoothTestDevice"
 
 class AdViewController: UIViewController, CBPeripheralDelegate, CBPeripheralManagerDelegate {
     @IBOutlet weak var tv: UITextView!
 
-    var name = UIDevice.currentDevice().name
     var pm: CBPeripheralManager!
     var characteristicM: CBMutableCharacteristic!
     var centrals = [CBCentral]()
@@ -25,29 +25,18 @@ class AdViewController: UIViewController, CBPeripheralDelegate, CBPeripheralMana
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view.
     }
 
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
     }
     
     @IBAction func ad(sender: AnyObject) {
         pm = CBPeripheralManager(delegate: self, queue: nil)
-
+        log("创建外围设备:\(pm.description)")
     }
-
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
-    }
-    */
-    @IBAction func setup(sender: AnyObject) {
+    
+    func setup() {
         let characteristicUUID = CBUUID(string: kCharacteristicUUID)
         let characteristicM = CBMutableCharacteristic(type: characteristicUUID, properties: .Notify, value: nil, permissions: .Readable)
         self.characteristicM = characteristicM
@@ -55,19 +44,21 @@ class AdViewController: UIViewController, CBPeripheralDelegate, CBPeripheralMana
         let serviceM = CBMutableService(type: serviceUUID, primary: true)
         serviceM.characteristics = [characteristicM]
         pm.addService(serviceM)
+        log("添加服务:\(serviceM.UUID)")
+        log("添加特征:\(characteristicM.UUID)")
     }
     
     func updateCharacteristicValue(){
-        let valueStr = name + "--\(NSDate().timeIntervalSince1970)"
+        let valueStr = kCharacteristicUUID + "--\(NSDate().timeIntervalSince1970)"
         let data = valueStr.dataUsingEncoding(NSUTF8StringEncoding)
         pm.updateValue(data!, forCharacteristic: self.characteristicM, onSubscribedCentrals: nil)
         log("更新特征值：\(valueStr)")
     }
-    
-    //
+
     func peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {
         if peripheral.state == CBPeripheralManagerState.PoweredOn {
             log("BLE已打开")
+            setup()
         } else {
             log("此设备不支持BLE或未打开蓝牙功能，无法作为外围设备.")
         }
@@ -78,8 +69,10 @@ class AdViewController: UIViewController, CBPeripheralDelegate, CBPeripheralMana
             log("添加服务失败：\(error!.localizedDescription)")
             return
         }
+        log("添加服务成功：\(service.UUID)")
         let dic = [CBAdvertisementDataLocalNameKey: name]
         pm.startAdvertising(dic)
+        log("开始启动广播...\(name)")
     }
     
     func peripheralManagerDidStartAdvertising(peripheral: CBPeripheralManager, error: NSError?) {
@@ -87,7 +80,7 @@ class AdViewController: UIViewController, CBPeripheralDelegate, CBPeripheralMana
             log("启动广播失败：\(error!.localizedDescription)")
             return
         }
-        log("启动广播...")
+        log("已经启动广播...")
     }
     
     func peripheralManager(peripheral: CBPeripheralManager, central: CBCentral, didSubscribeToCharacteristic characteristic: CBCharacteristic) {

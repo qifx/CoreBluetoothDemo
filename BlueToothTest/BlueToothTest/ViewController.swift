@@ -4,7 +4,7 @@
 //
 //  Created by qifx on 1/25/16.
 //  Copyright © 2016 qifx. All rights reserved.
-//
+//  中心设备
 
 import UIKit
 import CoreBluetooth
@@ -35,30 +35,34 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
     func centralManagerDidUpdateState(central: CBCentralManager) {
         switch central.state {
         case .PoweredOn:
-            manager.scanForPeripheralsWithServices(nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
             log("BLE已打开")
+            manager.scanForPeripheralsWithServices(nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
         default:
             log("此设备不支持BLE或未打开蓝牙功能，无法作为中心设备.")
         }
     }
     
-    
-    
-
-    
     func centralManager(central: CBCentralManager, didDiscoverPeripheral peripheral: CBPeripheral, advertisementData: [String : AnyObject], RSSI: NSNumber) {
-        log("发现外围设备")
-        manager.stopScan()
         if !didDiscoverPeripherals.contains(peripheral) {
             didDiscoverPeripherals.append(peripheral)
+        } else {
+            return
         }
-        log(peripheral.description)
+        if peripheral.name != nil {
+            if peripheral.name != name {
+                print(peripheral.name!)
+                return
+            }
+        } else {
+            return
+        }
+        log("发现外围设备:\(peripheral)")
         log("开始连接外围设备...")
         manager.connectPeripheral(peripheral, options: nil)
     }
     
     func centralManager(central: CBCentralManager, didConnectPeripheral peripheral: CBPeripheral) {
-        log("连接外围设备成功")
+        log("连接外围设备成功:\(peripheral)")
         connectedPeripheral = peripheral
         connectedPeripheral.delegate = self
         log("开始发现服务...")
@@ -67,11 +71,11 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
 
     
     func centralManager(central: CBCentralManager, didFailToConnectPeripheral peripheral: CBPeripheral, error: NSError?) {
-        log("连接外围设备失败")
+        log("连接外围设备失败:\(peripheral)")
     }
     
     func centralManager(central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: NSError?) {
-        log("外围设备连接断开")
+        log("外围设备连接断开:\(peripheral)")
     }
     
     func centralManager(central: CBCentralManager, willRestoreState dict: [String : AnyObject]) {
@@ -80,23 +84,19 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
     
     //MAKR: Peripheral
     func peripheral(peripheral: CBPeripheral, didDiscoverServices error: NSError?) {
-        log("发现可用服务")
         if error != nil {
             log(error!.description)
             return
         }
-        
         let serviceUUID = CBUUID(string: kServiceUUID)
         let characteristicUUID = CBUUID(string: kCharacteristicUUID)
         for s in peripheral.services! {
-            if s.UUID == serviceUUID {
-                peripheral.discoverCharacteristics([characteristicUUID], forService: s)
-            }
+            log("发现可用服务:\(peripheral) \(s.UUID)")
+            peripheral.discoverCharacteristics([characteristicUUID], forService: s)
         }
     }
     
     func peripheral(peripheral: CBPeripheral, didDiscoverCharacteristicsForService service: CBService, error: NSError?) {
-        log("发现可用特征")
         if error != nil {
             log(error!.description)
             return
@@ -107,6 +107,7 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
         
         if service.UUID == serviceUUID {
             for char in service.characteristics! {
+                log("发现可用特征:\(peripheral) \(char.UUID)")
                 if char.UUID == characteristicUUID {
                     peripheral.setNotifyValue(true, forCharacteristic: char)
                 }
@@ -115,10 +116,10 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
     }
     
     func peripheral(peripheral: CBPeripheral, didUpdateNotificationStateForCharacteristic characteristic: CBCharacteristic, error: NSError?) {
-        log("收到特征更新通知")
         if error != nil {
             log(error!.localizedDescription)
         }
+        log("收到特征更新通知:\(peripheral.name!) \(characteristic.UUID)")
         let characteristicUUID = CBUUID(string: kCharacteristicUUID)
         if characteristic.UUID == characteristicUUID {
             if characteristic.isNotifying {
